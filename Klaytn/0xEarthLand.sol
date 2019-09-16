@@ -19,7 +19,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     string _urlPrefix = "https://a.tile.openstreetmap.org/";
     string _urlPostfix = ".png";
     //default uri for land 
-    string _defaultUri = "https://0xearth.org/land/data.json";
+    string _defaultUri = "https://raw.githubusercontent.com/BULVRD-Tech/0xEarth.LAND/master/Klaytn/land.json";
 
     //bool flags for adjusting open token metadata updates 
     bool canSetCustomUri = false;
