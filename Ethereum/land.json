@@ -1,12 +1,14 @@
 {
   "name": "0xEarth LAND",
-  "image": "https://raw.githubusercontent.com/BULVRD-Tech/0xEarth.LAND/master/Ethereum/ic_0xEarth.png", 
+  "image": "https://raw.githubusercontent.com/BULVRD-Tech/0xEarth.LAND/master/Ethereum/metadata/19/0/0.json",
+  "imageIcon": "https://raw.githubusercontent.com/BULVRD-Tech/0xEarth.LAND/master/Ethereum/ic_0xEarth.png", 
   "description": "LAND generated via 0xEarth, the fully trustless digital land smart contract for Earth on the Ethereum Blockchain. ZXY and image data available by using the landZXY and landImageURI functions on the token smart contract directly with the landId.", 
   "attributes": {
     "mapResolution": 19,
     "z": 19,
     "x": 0,
-    "y": 0
+    "y": 0,
+    "olc": "8FVC9G8R+949"
   },
   "external_url": "https://0xearth.org/ethereum", 
   "background_color": "008ECC"
