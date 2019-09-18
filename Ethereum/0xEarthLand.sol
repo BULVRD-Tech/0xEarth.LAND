@@ -65,15 +65,6 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
 
     //All Minted land
     mapping (uint256 => LAND) _lands;
-    // LAND[] _lands;
-    //tracking of minted land 
-    mapping (uint256 => bool) _landIds;
-    //storing of ZXY of minted land
-    mapping (uint256 => string) _landZXYs;
-    //storing of land metadata uris 
-    mapping (uint256 => string) _landUris;
-    //storing of reference image for each land 
-    mapping (uint256 => string) _landImages;
     
     address proxyRegistryAddress;
     
@@ -155,18 +146,6 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         LAND memory land = LAND(_z, _x, _y, true, _landZXY, generateLandURI(_landZXY), generateImageURI(_landZXY));
         _lands[_landId] = land;
 
-        //Store the minting of this landId
-        _landIds[_landId] = true;
-
-        //Store the landZXY string against the landId
-        _landZXYs[_landId] = _landZXY;
-
-        //Set uri for the given landId
-        _landUris[_landId] = generateLandURI(_landZXY);
-
-        //Set image uri for the given landId
-        _landImages[_landId] = generateImageURI(_landZXY);
-
         //Increment _totalSupply
         _totalSupply++;
 
@@ -199,10 +178,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //Generated the landId based on the land ZXY format value
     function generateLandId(uint256 _z, uint256 _x, uint256 _y) public view returns (uint256) {
         string memory ids = string(abi.encodePacked(uint2str(_z), uint2str(_x), uint2str(_y)));
-       
-            return stringToUint(ids);
-    
-        // return uint256(keccak256(abi.encodePacked(_zxy)));
+        return stringToUint(ids);
     }
 
     //check if a given landId has been minted yet
@@ -217,12 +193,12 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
 
     //Returns the image url for a given landId
     function landImageURI(uint256 _landId) external view returns (string memory) {
-        return _landImages[_landId];
+        return _lands[_landId].imgUrl;
     }
 
     //Returns the landZXY string from landId ex. "19/10000/9999"
     function landZXY(uint256 _landId) external view returns (string memory) {
-        return _landZXYs[_landId];
+        return _lands[_landId].zxy;
     }
 
     //For updating the meta data of a given land. Can help with adding extended metadata such 
@@ -240,7 +216,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         }
 
         if(canUpdate){
-           _landUris[_landId] = _uri;
+           _lands[_landId].metaUrl = _uri;
            emit LandUriUpdate(_landId, _uri);
         }
     }
@@ -260,7 +236,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         }
 
         if(canUpdate){
-           _landImages[_landId] = _uri;
+           _lands[_landId].imgUrl = _uri;
            emit LandImageUriUpdate(_landId, _uri);
         }
     }
