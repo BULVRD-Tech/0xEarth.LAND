@@ -6,52 +6,72 @@ import 'github.com/OpenZeppelin/openzeppelin-solidity/contracts/lifecycle/Pausab
 
 contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
 
+    //Struct for a LAND token
+    struct LAND {
+        uint z;
+        uint x;
+        uint y;
+        bool exist;
+        string zxy;
+        string metaUrl;
+        string imgUrl;
+    }
+    
     //Total supply of minted land
     uint256 _totalSupply = 0;
     //max amount of land that can be minted from bulk function
     uint256 _maxBulkMint = 10;
     //Land resolution value
     uint256 _resolutionLevel = 19;
+    //Early land fee
+    //10 KLAY
+    uint256 _earlyLANDFee = 10;
     //Base fee for each LAND
+    //15 KLAY
     uint256 _baseLANDFee = 15;
 
     //URL values for creating land image uri 
     string _urlPrefix = "https://a.tile.openstreetmap.org/";
     string _urlPostfix = ".png";
     //default uri for land 
-    string _defaultUri = "https://raw.githubusercontent.com/BULVRD-Tech/0xEarth.LAND/master/Klaytn/land.json";
+    string _defaultUri = "https://0xearth.org/land/data.json";
+    
+     //default metadata prefix for land 
+    string _metaPrefix = "https://0xearth.org/land/";
+    string _metaPostfix = ".json";
 
     //bool flags for adjusting open token metadata updates 
     bool canSetCustomUri = false;
     bool canSetCustomImageUri = false;
     
+    //Events to notify of updates
     event LandMint(uint256 _z, uint256 _x, uint256 _y);
     event LandUriUpdate(uint256 _landId, string _uri);
     event LandImageUriUpdate(uint256 _landId, string _uri);
     event LandPrefixUpdate(string _uri);
     event LandPostfixUpdate(string _uri);
+    event MetaPrefixUpdate(string _uri);
+    event MetaPostfixUpdate(string _uri);
     event LandDefaultUriUpdate(string _uri);
-    
     event UpdatedMaxBulkMint(uint256 _amount);
     event UpdatedBaseLANDFee(uint256 _amount);
     event CanSetCustomUriUpdate(bool canUpdate);
     event CanSetCustomImageUriUpdate(bool canUpdate);
 
-    //tracking of minted land 
-    mapping (uint256 => bool) _landIds;
-    //storing of ZXY of minted land
-    mapping (uint256 => string) _landZXYs;
-    //storing of land metadata uris 
-    mapping (uint256 => string) _landUris;
-    //storing of reference image for each land 
-    mapping (uint256 => string) _landImages;
+    //All Minted land
+    mapping (uint256 => LAND) _lands;
     
     constructor(string memory _name, string memory _symbol) ERC721Full(_name, _symbol) public {
-        
+
     }
 
     function getLandFee(uint256 landCount) public view returns(uint256 fee){
-        uint256 landPrice = _baseLANDFee;
+        uint256 landPrice;
+        if(_totalSupply <= 10000){
+           landPrice = _earlyLANDFee;
+        }else {
+           landPrice = _baseLANDFee;
+        }
         fee = landPrice.div(10);
         if(landCount > 1){
             fee = fee.mul(landCount);
@@ -61,11 +81,9 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //mints a new token based on ZXY values of the land
     function mintLand(uint256 _z, uint256 _x, uint256 _y) public payable whenNotPaused{
         //validate transaction fees
-        if(msg.sender != owner()){
-            uint256 transactionFee = getLandFee(1);
-            require(msg.value >= transactionFee, "Insufficient KLAY fee sent.");
-        }
-
+        uint256 transactionFee = getLandFee(1);
+        require(msg.value >= transactionFee, "Insufficient ETH payment sent.");
+        
         internalLandMint(_z, _x, _y);
     }
 
@@ -88,7 +106,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         //validate transaction fees
         if(msg.sender != owner()){
             uint256 transactionFee = getLandFee(_zLength);
-            require(msg.value >= transactionFee, "Insufficient KLAY fee sent.");
+            require(msg.value >= transactionFee, "Insufficient ETH payment sent.");
         }
 
         //loop over each and mint
@@ -104,27 +122,20 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     function internalLandMint(uint256 _z, uint256 _x, uint256 _y) private whenNotPaused{
          //make sure the land resolution level matches
         require(_z == _resolutionLevel, "Land resolution value does not match");
+        //Validate tile index
+        require(_x >= 0, "Tile index not allowed");
+        require(_y >= 0, "Tile index not allowed");
 
         //Generate the landZXY string based on passed in values
         string memory _landZXY = generateZXYString(_z, _x, _y);
 
         //Generated the landId based on the full format string of the Land
-        uint256 _landId = generateLandId(_landZXY);
+        uint256 _landId = generateLandId(_z, _x, _y);
 
         //Require this to be a unique land value
         require(landIdsContains(_landId) == false);
-
-        //Store the minting of this landId
-        _landIds[_landId] = true;
-
-        //Store the landZXY string against the landId
-        _landZXYs[_landId] = _landZXY;
-
-        //Set uri for the given landId
-        _landUris[_landId] = _defaultUri;
-
-        //Set uri for the given landId
-        _landImages[_landId] = generateImageURI(_landZXY);
+        LAND memory land = LAND(_z, _x, _y, true, _landZXY, generateLandURI(_landZXY), generateImageURI(_landZXY));
+        _lands[_landId] = land;
 
         //Increment _totalSupply
         _totalSupply++;
@@ -139,52 +150,64 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         return string(abi.encodePacked(uint2str(_z), "/", uint2str(_x), "/", uint2str(_y)));
     }
 
+    //TODO this is just an idea, would require an oracle to listen for mints and generate the meta to match
     //Returns the image url for a given landId
+    function generateLandURI(string memory _landZXY) public view returns (string memory) {
+        return string(abi.encodePacked(_metaPrefix, _landZXY, _metaPostfix));
+    }
+    
+    //Returns the metadata url for a given landId
     function generateImageURI(string memory _landZXY) public view returns (string memory) {
         return string(abi.encodePacked(_urlPrefix, _landZXY, _urlPostfix));
     }
+    
+    function regenerateImageURI(uint256 _landId) public  {
+        require(landIdsContains(_landId) == true);
+        _lands[_landId].imgUrl = generateImageURI(_lands[_landId].zxy);
+    }
 
     //Generated the landId based on the land ZXY format value
-    function generateLandId(string memory _zxy) public view returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(_zxy)));
+    function generateLandId(uint256 _z, uint256 _x, uint256 _y) public view returns (uint256) {
+        string memory ids = string(abi.encodePacked(uint2str(_z), uint2str(_x), uint2str(_y)));
+        return stringToUint(ids);
     }
 
     //check if a given landId has been minted yet
-    function landIdsContains(uint256 _landId) public view returns (bool){
-        return _landIds[_landId];
+    function landIdsContains(uint256 _landId) public returns (bool){
+        return _lands[_landId].exist;
     }
 
     //Returns the metadata uri for the token
     function tokenURI(uint256 _tokenId) external view returns (string memory) {
-        return _landUris[_tokenId];
+        return _lands[_tokenId].metaUrl;
     } 
 
     //Returns the image url for a given landId
     function landImageURI(uint256 _landId) external view returns (string memory) {
-        return _landImages[_landId];
+        return _lands[_landId].imgUrl;
     }
 
     //Returns the landZXY string from landId ex. "19/10000/9999"
     function landZXY(uint256 _landId) external view returns (string memory) {
-        return _landZXYs[_landId];
+        return _lands[_landId].zxy;
     }
 
     //For updating the meta data of a given land. Can help with adding extended metadata such 
     //as area size, lat/lng center, etc down the road. Optionally open up access
     function updateLandUri(uint256 _landId, string memory _uri) public {
-        bool canUpdate = canSetCustomUri;
-
         address landOwner = ownerOf(_landId);
         if(msg.sender == landOwner){
             canUpdate = true;
         }
         
+        bool canUpdate = canSetCustomUri;
+
         if(msg.sender == owner()){
            canUpdate = true;
         }
 
         if(canUpdate){
-           _landUris[_landId] = _uri;
+           _lands[_landId].metaUrl = _uri;
            emit LandUriUpdate(_landId, _uri);
         }
     }
@@ -192,19 +215,19 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //For updating the image uri of a given land. Can help with updating 
     //if an image source is shutdown or changes
     function updateLandImageUri(uint256 _landId, string memory _uri) public {
-        bool canUpdate = canSetCustomImageUri;
-
         address landOwner = ownerOf(_landId);
         if(msg.sender == landOwner){
             canUpdate = true;
         }
+
+         bool canUpdate = canSetCustomImageUri;
         
         if(msg.sender == owner()){
            canUpdate = true;
         }
 
         if(canUpdate){
-           _landImages[_landId] = _uri;
+           _lands[_landId].imgUrl = _uri;
            emit LandImageUriUpdate(_landId, _uri);
         }
     }
@@ -232,6 +255,18 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         _urlPostfix = _postfix;
         emit LandPostfixUpdate(_postfix);
     }
+    
+    //To update the uri prefix for the land image uri
+    function updateMetaPrefix(string memory _prefix) public onlyOwner{
+        _metaPrefix = _prefix;
+        emit MetaPrefixUpdate(_prefix);
+    }
+
+    //To update the uri postfix for the land image uri
+    function updateMetaPostfix(string memory _postfix) public onlyOwner{
+        _metaPostfix = _postfix;
+        emit MetaPostfixUpdate(_postfix);
+    }
 
     //To update the default land uri
     function updateDefaultUri(string memory _uri) public onlyOwner{
@@ -240,15 +275,20 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     }
 
     //To update the max bulk minting amount
+    function updateBaseLANDFee(uint256 _amount) public onlyOwner{
+        _baseLANDFee = _amount;
+        emit UpdatedBaseLANDFee(_amount);
+    }
+    
+    //To update the max bulk minting amount
     function updateMaxBulkMint(uint256 _amount) public onlyOwner{
         _maxBulkMint = _amount;
         emit UpdatedMaxBulkMint(_amount);
     }
-
-    //To update the max bulk minting amount
-    function updateBaseLANDFee(uint256 _amount) public onlyOwner{
-        _baseLANDFee = _amount;
-        emit UpdatedBaseLANDFee(_amount);
+    
+    function transferAnyERC20Token(address tokenAddress, uint tokens) public returns (bool success) {
+        require(owner == msg.sender);
+        return IERC20(tokenAddress).transfer(owner, tokens);
     }
     
     function getBalanceThis() view public returns(uint){
@@ -259,6 +299,26 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         msg.sender.transfer(address(this).balance);
         return true;
     }
+    
+    /**
+   * Override isApprovedForAll to whitelist user's OpenSea proxy accounts to enable gas-less listings.
+   */
+  function isApprovedForAll(
+    address owner,
+    address operator
+  )
+    public
+    view
+    returns (bool)
+  {
+    // Whitelist OpenSea proxy contract for easy trading.
+    ProxyRegistry proxyRegistry = ProxyRegistry(proxyRegistryAddress);
+    if (address(proxyRegistry.proxies(owner)) == operator) {
+        return true;
+    }
+
+    return super.isApprovedForAll(owner, operator);
+  }
     
     function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
         if (_i == 0) {
@@ -279,12 +339,23 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         return string(bstr);
     }
 
+function stringToUint(string memory s) internal pure returns (uint) {
+    bytes memory b = bytes(s);
+    uint result = 0;
+    for (uint i = 0; i < b.length; i++) { // c = b[i] was not needed
+        if (b[i].length >= 48 && b[i].length <= 57) {
+            result = result * 10 + (uint(b[i].length) - 48); // bytes and int are not compatible with the operator -.
+        }
+    }
+    return result; // this was missing
+}
+
 }
 
 /**
  * @title 0xEarthLand
- * 0xEarthLand - a contract for digital land ownership.
+ * 0xEarth Land - a contract for digital land ownership on Klaytn
  */
 contract Land is TradeableERC721Token {
-  constructor() TradeableERC721Token("0xEarth", "LAND") public {  }
+  constructor(address _proxyRegistryAddress) TradeableERC721Token("0xEarth Klaytn", "LAND") public {  }
 }
