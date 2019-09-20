@@ -88,10 +88,8 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //mints a new token based on ZXY values of the land
     function mintLand(uint256 _z, uint256 _x, uint256 _y) public payable whenNotPaused{
         //validate transaction fees
-        if(msg.sender != owner()){
-            uint256 transactionFee = getLandFee(1);
-            require(msg.value >= transactionFee, "Insufficient ETH payment sent.");
-        }
+        uint256 transactionFee = getLandFee(1);
+        require(msg.value >= transactionFee, "Insufficient ETH payment sent.");
 
         internalLandMint(_z, _x, _y);
     }
@@ -204,12 +202,12 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //For updating the meta data of a given land. Can help with adding extended metadata such 
     //as area size, lat/lng center, etc down the road. Optionally open up access
     function updateLandUri(uint256 _landId, string memory _uri) public {
-        bool canUpdate = canSetCustomUri;
-
         address landOwner = ownerOf(_landId);
         if(msg.sender == landOwner){
             canUpdate = true;
         }
+
+        bool canUpdate = canSetCustomUri;
         
         if(msg.sender == owner()){
            canUpdate = true;
@@ -224,12 +222,12 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //For updating the image uri of a given land. Can help with updating 
     //if an image source is shutdown or changes
     function updateLandImageUri(uint256 _landId, string memory _uri) public {
-        bool canUpdate = canSetCustomImageUri;
-
         address landOwner = ownerOf(_landId);
         if(msg.sender == landOwner){
             canUpdate = true;
         }
+
+        bool canUpdate = canSetCustomImageUri;
         
         if(msg.sender == owner()){
            canUpdate = true;
@@ -358,8 +356,8 @@ function stringToUint(string memory s) internal pure returns (uint) {
 
 /**
  * @title 0xEarthLand
- * 0xEarthLand - a contract for digital land ownership.
+ * 0xEarthLand - a contract for digital land ownership on Ethereum
  */
 contract Land is TradeableERC721Token {
-  constructor(address _proxyRegistryAddress) TradeableERC721Token("0xEarth", "LAND", _proxyRegistryAddress) public {  }
+  constructor(address _proxyRegistryAddress) TradeableERC721Token("0xEarth Ethereum", "LAND", _proxyRegistryAddress) public {  }
 }
