@@ -67,9 +67,10 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     mapping (uint256 => LAND) _lands;
     
     address proxyRegistryAddress;
+    address public gatewayAddress;
     
-    constructor(string memory _name, string memory _symbol, address _proxyRegistryAddress) ERC721Full(_name, _symbol) public {
-        proxyRegistryAddress = _proxyRegistryAddress;
+    constructor(string memory _name, string memory _symbol) ERC721Full(_name, _symbol) public {
+        
     }
 
     function getLandFee(uint256 landCount) public view returns(uint256 fee){
@@ -203,18 +204,15 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //as area size, lat/lng center, etc down the road. Optionally open up access
     function updateLandUri(uint256 _landId, string memory _uri) public {
         address landOwner = ownerOf(_landId);
-        if(msg.sender == landOwner){
-            canUpdate = true;
-        }
-
-        bool canUpdate = canSetCustomUri;
+         if(canSetCustomUri){
+            if(msg.sender == landOwner){
+                _lands[_landId].metaUrl = _uri;
+                emit LandUriUpdate(_landId, _uri);
+            }
+         }
         
         if(msg.sender == owner()){
-           canUpdate = true;
-        }
-
-        if(canUpdate){
-           _lands[_landId].metaUrl = _uri;
+            _lands[_landId].metaUrl = _uri;
            emit LandUriUpdate(_landId, _uri);
         }
     }
@@ -223,18 +221,16 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //if an image source is shutdown or changes
     function updateLandImageUri(uint256 _landId, string memory _uri) public {
         address landOwner = ownerOf(_landId);
-        if(msg.sender == landOwner){
-            canUpdate = true;
-        }
-
-        bool canUpdate = canSetCustomImageUri;
+         
+         if (canSetCustomImageUri){
+            if(msg.sender == landOwner){
+                 _lands[_landId].imgUrl = _uri;
+             emit LandImageUriUpdate(_landId, _uri);
+            }
+         }
         
         if(msg.sender == owner()){
-           canUpdate = true;
-        }
-
-        if(canUpdate){
-           _lands[_landId].imgUrl = _uri;
+            _lands[_landId].imgUrl = _uri;
            emit LandImageUriUpdate(_landId, _uri);
         }
     }
@@ -291,6 +287,20 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     function updateMaxBulkMint(uint256 _amount) public onlyOwner{
         _maxBulkMint = _amount;
         emit UpdatedMaxBulkMint(_amount);
+    }
+    
+     //Update proxya address, mainly used for OpenSea
+    function updateProxyAddress(address _proxy) public onlyOwner {
+        proxyRegistryAddress = _proxy;
+    }
+    
+    //Update gateway address, for possible sidechain use
+    function updateGatewayAddress(address _gateway) public onlyOwner {
+        gatewayAddress = _gateway;
+    }
+    
+    function depositToGateway(uint tokenId) public {
+        safeTransferFrom(msg.sender, gatewayAddress, tokenId);
     }
     
     function getBalanceThis() view public returns(uint){
@@ -359,5 +369,5 @@ function stringToUint(string memory s) internal pure returns (uint) {
  * 0xEarthLand - a contract for digital land ownership on Ethereum
  */
 contract Land is TradeableERC721Token {
-  constructor(address _proxyRegistryAddress) TradeableERC721Token("0xEarth Ethereum", "LAND", _proxyRegistryAddress) public {  }
+  constructor() TradeableERC721Token("0xEarth Ethereum", "LAND") public {  }
 }
