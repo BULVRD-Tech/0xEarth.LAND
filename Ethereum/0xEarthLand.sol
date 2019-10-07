@@ -28,6 +28,8 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     uint256 _maxBulkMint = 10;
     //Land resolution value
     uint256 _resolutionLevel = 19;
+    //Early LAND for lower fee
+    uint256 _earlyLANDCap = 10000;
     //Early land fee
     //0.0075
     uint256 _earlyLANDFee = 7500000000000000;
@@ -60,6 +62,8 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     
     event UpdatedMaxBulkMint(uint256 _amount);
     event UpdatedBaseLANDFee(uint256 _amount);
+    event UpdatedEarlyLANDFee(uint256 _amount);
+    event UpdatedEarlyLANDCap(uint256 _amount);
     event CanSetCustomUriUpdate(bool canUpdate);
     event CanSetCustomImageUriUpdate(bool canUpdate);
 
@@ -75,7 +79,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
 
     function getLandFee(uint256 landCount) public view returns(uint256 fee){
         uint256 landPrice;
-        if(_totalSupply <= 10000){
+        if(_totalSupply <= _earlyLANDCap){
            landPrice = _earlyLANDFee;
         }else {
            landPrice = _baseLANDFee;
@@ -185,6 +189,11 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         return _lands[_landId].exist;
     }
 
+    //Helper method to input a ZXY value to see if LAND exist
+    function landIdsContainsZXY(uint256 _z, uint256 _x, uint256 _y) public returns (bool){
+        return _lands[generateLandId(_z, _x, _y)].exist;
+    }
+
     //Returns the metadata uri for the token
     function tokenURI(uint256 _tokenId) external view returns (string memory) {
         return _lands[_tokenId].metaUrl;
@@ -277,10 +286,22 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         emit LandDefaultUriUpdate(_uri);
     }
 
-    //To update the max bulk minting amount
+    //To update the base LAND fee
     function updateBaseLANDFee(uint256 _amount) public onlyOwner{
         _baseLANDFee = _amount;
         emit UpdatedBaseLANDFee(_amount);
+    }
+    
+    //To update the early LAND fee
+    function updateEarlyLANDFee(uint256 _amount) public onlyOwner{
+        _earlyLANDFee = _amount;
+        emit UpdatedEarlyLANDFee(_amount);
+    }
+    
+    //To update the early LAND Cap
+    function updateEarlyLANDCap(uint256 _amount) public onlyOwner{
+        _earlyLANDCap = _amount;
+        emit UpdatedEarlyLANDCap(_amount);
     }
     
     //To update the max bulk minting amount
