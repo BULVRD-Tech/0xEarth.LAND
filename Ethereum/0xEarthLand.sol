@@ -95,7 +95,6 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         //validate transaction fees
         uint256 transactionFee = getLandFee(1);
         require(msg.value >= transactionFee, "Insufficient ETH payment sent.");
-
         internalLandMint(_z, _x, _y);
     }
 
