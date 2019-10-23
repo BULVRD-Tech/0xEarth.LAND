@@ -56,7 +56,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     event LandMint(uint256 _z, uint256 _x, uint256 _y);
     event LandUriUpdate(uint256 _landId, string _uri);
     event LandImageUriUpdate(uint256 _landId, string _uri);
-    event LandIsRentableUpdate(uint256 _landId, bool _canRent)
+    event LandIsRentableUpdate(uint256 _landId, bool _canRent);
     event LandPrefixUpdate(string _uri);
     event LandPostfixUpdate(string _uri);
     event MetaPrefixUpdate(string _uri);
@@ -209,8 +209,8 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     }
 
     //Returns the if the LAND is rentable
-    function landIsRentable(uint256 _landId) external view returns (boool memory) {
-        return _lands[_landId].canRent;
+    function landIsRentable(uint256 _landId) external view returns (bool) {
+        return _lands[_landId].isRentable;
     }
 
     //Returns the landZXY string from landId ex. "19/10000/9999"
@@ -220,10 +220,10 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
 
     //For updating the meta data of a given land. Can help with adding extended metadata such 
     //as area size, lat/lng center, etc down the road. Optionally open up access
-    function updateLandIsRentable(uint256 _landId, bool memory _canRent) public {
+    function updateLandIsRentable(uint256 _landId, bool _canRent) public {
         address landOwner = ownerOf(_landId);
          if(msg.sender == landOwner){
-            _lands[_landId].canRent = _canRent;
+            _lands[_landId].isRentable = _canRent;
             emit LandIsRentableUpdate(_landId, _canRent);
         }
     }
