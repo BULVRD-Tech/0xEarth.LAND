@@ -1,6 +1,7 @@
 pragma solidity ^0.5.9;
 
 import 'github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC721/ERC721Full.sol';
+import "github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import 'github.com/OpenZeppelin/openzeppelin-solidity/contracts/ownership/Ownable.sol';
 import 'github.com/OpenZeppelin/openzeppelin-solidity/contracts/lifecycle/Pausable.sol';
 
@@ -12,6 +13,7 @@ contract ProxyRegistry {
 
 contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
 
+    //Object for each LAND
     struct LAND {
         uint z;
         uint x;
@@ -20,7 +22,28 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         string zxy;
         string metaUrl;
         string imgUrl;
+        string originSeller;
         bool isRentable;
+    }
+
+    //Object for each supported payable token
+    struct PayableToken {
+        uint id;
+        address tokenAddress;
+        string tokenName;
+        string tokenId;
+        uint decimals;
+        uint payableAmount;
+        bool isEnabled;
+    }
+
+    //Object for each approved dApp 
+    struct Dapps {
+        uint id;
+        address payableAddress;
+        string dappName;
+        uint sales;
+        bool isEnabled;
     }
     
     //Total supply of minted land
@@ -71,18 +94,24 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     event CanSetCustomUriUpdate(bool canUpdate);
     event CanSetCustomImageUriUpdate(bool canUpdate);
 
+    event UpdatedProxyAddress(address proxyAddress);
+    event UpdatedGatewayAddress(address gatewayAddress);
+    event UpdatedTreasuryAddress(address treasuryAddress);
 
     //All Minted land
     mapping (uint256 => LAND) _lands;
+    mapping (uint256 => PayableToken) _tokens;
+    mapping (uint256 => Dapps) _dapps;
     
-    address proxyRegistryAddress;
+    address public proxyRegistryAddress;
     address public gatewayAddress;
+    address public treasuryAddress;
     
     constructor(string memory _name, string memory _symbol) ERC721Full(_name, _symbol) public {
         
     }
 
-    function getLandFee(uint256 landCount) public view returns(uint256 fee){
+    function getLandFeeEth(uint256 landCount) public view returns(uint256 fee){
         uint256 landPrice;
         if(_totalSupply <= _earlyLANDCap){
            landPrice = _earlyLANDFee;
@@ -95,16 +124,25 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         }
     }
 
+     function mintLandErc20(uint256 _z, uint256 _x, uint256 _y, string origin, unint256 tokenId, uint256 tokenAmount ) public {
+       PayableToken storage _payableToken = payableTokenObjectForTokenId(_tokenId);
+       require(tokenAmount >= _payableToken.payableAmount, "Token payable amount not met");
+       bool result = ERC20(tokenAddress).transferFrom(msg.sender, treasuryAddress, tokenAmount);
+        if (result) {
+           internalLandMint(_z, _x, _y);
+        } 
+  }
+
     //mints a new token based on ZXY values of the land
-    function mintLand(uint256 _z, uint256 _x, uint256 _y) public payable whenNotPaused{
+    function mintLand(uint256 _z, uint256 _x, uint256 _y, string origin) public payable whenNotPaused{
         //validate transaction fees
-        uint256 transactionFee = getLandFee(1);
+        uint256 transactionFee = getLandFeeEth(1);
         require(msg.value >= transactionFee, "Insufficient ETH payment sent.");
         internalLandMint(_z, _x, _y);
     }
 
     //bulk mints a new token based an array of ZXY values of the land(s)
-    function bulkMintLand(uint256[] memory _zs, uint256[] memory _xs, uint256[] memory _ys) public payable whenNotPaused{
+    function bulkMintLand(uint256[] memory _zs, uint256[] memory _xs, uint256[] memory _ys, string origin) public payable whenNotPaused{
         //get lengths of each coordinate passed through
         uint256 _zLength = _zs.length;
         uint256 _xLength = _xs.length;
@@ -121,7 +159,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
 
         //validate transaction fees
         if(msg.sender != owner()){
-            uint256 transactionFee = getLandFee(_zLength);
+            uint256 transactionFee = getLandFeeEth(_zLength);
             require(msg.value >= transactionFee, "Insufficient ETH payment sent.");
         }
 
@@ -159,6 +197,11 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         //Mint and send Land to sender
         _safeMint(msg.sender, _landId);
         emit LandMint(_z, _x, _y);
+    }
+
+    //Returns PayableToken object based on the tokenId
+    function payableTokenObjectForTokenId(uint256 _tokenId) internal view returns (PayableToken storage) {
+        return _tokens[_tokenId];
     }
 
     //Generates the land format value ex. "19/10000/19999"
@@ -232,14 +275,17 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //as area size, lat/lng center, etc down the road. Optionally open up access
     function updateLandUri(uint256 _landId, string memory _uri) public {
         address landOwner = ownerOf(_landId);
+        bool canUpdate = false;
+        if(msg.sender == owner()){
+            canUpdate = true;
+        }
          if(canSetCustomUri){
             if(msg.sender == landOwner){
-                _lands[_landId].metaUrl = _uri;
-                emit LandUriUpdate(_landId, _uri);
+                canUpdate = true;
             }
          }
         
-        if(msg.sender == owner()){
+        if(canUpdate){
             _lands[_landId].metaUrl = _uri;
            emit LandUriUpdate(_landId, _uri);
         }
@@ -249,15 +295,16 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     //if an image source is shutdown or changes
     function updateLandImageUri(uint256 _landId, string memory _uri) public {
         address landOwner = ownerOf(_landId);
-         
-         if (canSetCustomImageUri){
+         if(msg.sender == owner()){
+            canUpdate = true;
+        }
+         if(canSetCustomUri){
             if(msg.sender == landOwner){
-                 _lands[_landId].imgUrl = _uri;
-             emit LandImageUriUpdate(_landId, _uri);
+                canUpdate = true;
             }
          }
         
-        if(msg.sender == owner()){
+        if(canUpdate){
             _lands[_landId].imgUrl = _uri;
            emit LandImageUriUpdate(_landId, _uri);
         }
@@ -338,11 +385,19 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
      //Update proxya address, mainly used for OpenSea
     function updateProxyAddress(address _proxy) public onlyOwner {
         proxyRegistryAddress = _proxy;
+        emit UpdatedProxyAddress(_proxy);
     }
     
     //Update gateway address, for possible sidechain use
     function updateGatewayAddress(address _gateway) public onlyOwner {
         gatewayAddress = _gateway;
+        emit UpdatedGatewayAddress(_gateway);
+    }
+
+    //Update treasury address, to change where payments are sent
+    function updateTreasuryAddress(address _treasury) public onlyOwner {
+        treasuryAddress = _treasury;
+        emit UpdatedTreasuryAddress(_treasury);
     }
     
     function depositToGateway(uint tokenId) public {
@@ -354,7 +409,7 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     }
 
     function withdraw() public onlyOwner returns(bool) {
-        msg.sender.transfer(address(this).balance);
+        treasuryAddress.transfer(address(this).balance);
         return true;
     }
     
