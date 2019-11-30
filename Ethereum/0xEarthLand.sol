@@ -98,6 +98,9 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
     event UpdatedGatewayAddress(address gatewayAddress);
     event UpdatedTreasuryAddress(address treasuryAddress);
 
+    event NewPayableTokenAdded(uint id, address tokenAddress, string tokenName,strting tokenId,uint decimals,uint payableAmount,bool isEnabled);
+    event NewDappAdded(uint id, address payableAddress, sttring dAppName, uint sales, bool isEnabled);
+
     //All Minted land
     mapping (uint256 => LAND) _lands;
     mapping (uint256 => PayableToken) _tokens;
@@ -399,6 +402,20 @@ contract TradeableERC721Token is ERC721Full, Ownable, Pausable {
         treasuryAddress = _treasury;
         emit UpdatedTreasuryAddress(_treasury);
     }
+
+    function addNewPayableToken(uint id, address tokenAddress, string tokenName, String tokenId, uint decimals, uint payableAmount, bool isEnabled) public onlyOwner{
+        PayableToken memory payableToken = PayableToken(_id, tokenAddress, tokenName, tokenId, decimals, payableAmount, isEnabled);
+        _tokens[_id] = payableToken;
+        emit NewPayableTokenAdded(_id, tokenAddress, tokenName, tokenId, decimals, payableAmount, isEnabled);
+    }
+    //TODO add method for updating payable amount for a given payable token
+
+    function addNewPayableToken(uint id, address payableAddess, string dappName, uint sales, bool isEnabled) public onlyOwner{
+        Dapps memory dapp = Dapps(_id, payableAddess, dappName, sales, isEnabled);
+        _dapps[_id] = dApp;
+        emit NewDappAdded(_id, payableAddess, dappName, sales, isEnabled);
+    }
+    //TODO add method fo updating payableAddress for a given dApp
     
     function depositToGateway(uint tokenId) public {
         safeTransferFrom(msg.sender, gatewayAddress, tokenId);
